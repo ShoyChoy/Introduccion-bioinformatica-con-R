@@ -1,0 +1,174 @@
+---
+title: "Búsqueda en PubMed"
+output: html_notebook
+---
+
+Primero hay que instalar y cargar el paquete “RISmed”. También definimos la opción para no se lean los
+strings como factores.
+```{r}
+options(stringsAsFactors = F)
+#Cargar paquete
+install.packages("RISmed")
+library(RISmed)
+```
+
+```{r}
+#Hacer query
+query_colon <- "\"colon\"[TIAB] AND \"cancer\"[TIAB] AND \"young\"[TIAB] AND (\"mutation\"[TIAB] OR \"alteration\"[TIAB] OR \"treatment\"[TIAB] OR \"hereditary\"[TIAB])" 
+
+#Instrucción para crear un query
+search_query <- EUtilsSummary(query_colon)
+
+#Hacer un resumen de la búsqueda
+summary(search_query)
+```
+
+Obtener datos de los artículos
+```{r}
+#Ejecutar la búsqueda para obtener los datos de PUBMED
+records <- EUtilsGet(search_query)
+
+#Con esta instrucción obtenemos el título, abstract y el PUBMED ID
+pubmed_data <-data.frame('Title'=ArticleTitle(records), 'Abstract'=AbstractText(records), 'PID'=ArticleId(records))
+dim(pubmed_data)
+```
+
+```{r}
+pubmed_data[1,]
+```
+
+```{r}
+pubmed_data[1:3,c("Title","PID")]
+```
+
+
+Preprocesar datos
+```{r}
+#Eliminar algunos caracteres del título y del abstract
+pubmed_data$Title <- gsub(pattern="\\.|:|,|;|\\[|\\]", replacement="", pubmed_data$Title)
+pubmed_data$Abstract <- gsub(pattern="\\.|:|,|;|\\[|\\]", replacement="", pubmed_data$Abstract)
+
+#Pasar todo a minúsculas
+pubmed_data$Title <- tolower(pubmed_data$Title)
+pubmed_data$Abstract <- tolower(pubmed_data$Abstract)
+pubmed_data[1,]
+```
+
+```{r}
+length(pubmed_data$Title)
+```
+
+Obtener las palabras del abstract
+```{r}
+#Con strsplit podemos separar las palabras por espacio
+unlist(strsplit(pubmed_data$Abstract[1], " "))[1:10]
+```
+
+Problemas con algunos abstracts
+```{r}
+#Artículos de los cuales no se obtiene el abstract
+which(pubmed_data$Abstract == "")
+```
+
+Obtener las palabras del abstract
+```{r}
+#Obtener las palabras en un data frame junto con el PUBMED ID
+# data frame para guardar las palabras
+word_list <- c()
+#Ciclo para todos los abstracts
+for(i in 1:length(pubmed_data$Abstract)){
+	#Obtener las palabras como vector en lugar de lista
+	aux_word <- unlist(strsplit(pubmed_data$Abstract[i], " "))
+	#Si el abstract tiene palabras
+	if(length(aux_word) > 0){
+		#Se juntan las palabras y el PUBMED ID
+		aux_list <- cbind(pubmed_data$PID[i], aux_word)
+		#Se pega este data frame auxiliar al que guarda todo
+		word_list <- rbind(word_list, aux_list)
+	}}
+colnames(word_list) <- c("PID","Word")
+dim(word_list)
+word_list[1:5,]
+```
+
+Quitar “stopwords”
+```{r}
+#Cargar paquete tm
+install.packages("tm")
+library(tm)
+
+#Obtener stopwords en ingles
+stop_words <- stopwords(kind="en")
+stop_words
+```
+
+```{r}
+#Palabras que son stopwords
+index_stop_word <- which(word_list[,2] %in% stop_words)
+length(index_stop_word)
+```
+
+```{r}
+#Quitar stopwords
+word_list <- word_list[-index_stop_word,]
+dim(word_list)
+```
+
+Palabras más frecuentes
+```{r}
+#Instrucción table y sort para obtener una tabla y ordenarla
+sort(table(word_list[,2]), decreasing=T)[1:10]
+```
+
+Dejar una combinación palabra-documento
+```{r}
+#Crear un data frame y agregar una columna con la combinación PID_palabra
+word_df <- data.frame(PID=as.numeric(word_list[,1]), Word=word_list[,2],
+PIDWord=as.character(apply(word_list, 1, paste, collapse="_")))
+word_df[1:5,]
+```
+
+Quitar repetidos usando duplicated
+```{r}
+#Obtener duplicados
+dup_index <- duplicated(word_df$PIDWord)
+word_df$PIDWord[1:10]
+dup_index[1:10]
+length(which(dup_index))
+```
+
+Quitar duplicados
+```{r}
+#Quitar duplicados
+dim(word_df)
+word_df <- word_df[-which(dup_index),]
+dim(word_df)
+```
+
+Palabras más frecuentes
+```{r}
+#Instrucción table y sort para obtener una tabla y ordenarla
+sort(table(word_df$Word), decreasing=T)[1:10]
+```
+
+Esto no les dice mucho, ¿pero qué pasaría si buscaran genes (u otra palabra clave) entre las palabras de la lista?
+
+```{r}
+#Buscar 3 genes relacionados a cáncer de colon: APC, KRAS y TP53
+word_df <- word_df[order(word_df$PID, decreasing=T),]
+index_genes <- which(word_df$Word %in% c("apc","kras","tp53"))
+length(index_genes)
+```
+
+```{r}
+word_df[index_genes[1:5], c("PID","Word")]
+```
+
+```{r}
+pubmed_data$Title[which(pubmed_data$PID == "31427573")]
+```
+
+```{r}
+pubmed_data$PID[which(pubmed_data$PID == "31427573")]
+```
+

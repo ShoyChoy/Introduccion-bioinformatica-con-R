@@ -1,0 +1,118 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+---
+title: "Actividad 4"
+output:
+  pdf_document: default
+  html_notebook: default
+  html_document:
+    df_print: paged
+---
+
+Definimos la opcion para que no se lean los strings como factores. 
+
+```{r}
+options(stringsAsFactors=F)
+```
+
+Carga del archivo
+```{r}
+setwd("C:\\Users\\Choy\\Documents\\Semestre 2\\Análisis de biología computacional")
+load("TCGA_COADREAD_comp_data.RData")
+```
+
+Obtener genes diferencialmente expresados con una prueba t Student y la diferencia de medias
+
+Calculamos la diferencia entre las medias tal como lo hicimos en la Actividad 2, primero obtendremos los índices para cada tipo de muestra y luego hacemos el cálculo
+
+```{r}
+y_muestras<-which(tcga_coadread_class=="Young")
+o_muestras<-which(tcga_coadread_class=="Old")
+```
+
+La siguiente será la matriz que además de las diferencias, mostrará los p values y el FC.
+
+```{r}
+matriz_ttest <- matrix(NA, nrow=nrow(tcga_coadread), ncol=4,
+dimnames=list(rownames(tcga_coadread),c("Young","Old", "P value", "Fold change")))
+matriz_ttest[1:5,]
+```
+
+
+Corremos un ciclo for para obtener los promedios, sus diferencias, el p value y el fold change para cada gen
+```{r}
+for(i in 1:nrow(tcga_coadread)){
+  media_young <- mean(tcga_coadread[i, y_muestras])
+  media_old <- mean(tcga_coadread[i, o_muestras])
+  p_value <- t.test(tcga_coadread[i, y_muestras], tcga_coadread[i, o_muestras])$p.value
+  fold_change <- media_young -media_old
+  matriz_ttest[i,] <- c(media_young, media_old,p_value, fold_change)
+}
+matriz_ttest[1:5,]
+```
+
+Algunos genes tienen muy poca expresión (como el TBC1D3P2), así que los descriminaremos de nuestro análisis.
+
+```{r}
+index_filter_exp <- which(apply(matriz_ttest[,1:2], 1, function(x) all(x < 1)))
+matriz_medias <- matriz_medias[-index_filter_exp,]
+matriz_ttest <- matriz_ttest[-index_filter_exp,]
+```
+
+Haremos una selección más fina de genes, tomando a aquellos cuyo p value es menor a 0.01 (estrictamente significativos), y después los clasificaremos según si están sobreexpresados (positivos) o subexpresados (negativos) utilizando el Foldchange.
+
+Definimos la matriz “matriz_ttest_pval” para tener los genes ordenados por p-value.
+```{r}
+index_order_pvals <- order(abs(matriz_ttest[,"P value"]))[1:20]
+
+matriz_ttest_pval <- matriz_ttest[index_order_pvals,]
+
+index_de_high <- which(matriz_ttest_pval[,"P value"] < 0.01 & matriz_ttest_pval[,"Fold change"] > 0)
+de_genes_high <- rownames(matriz_ttest_pval)[index_de_high]
+
+index_de_low <- which(matriz_ttest_pval[,"P value"] < 0.01 & matriz_ttest_pval[,"Fold change"] < 0)
+de_genes_low <- rownames(matriz_ttest_pval)[index_de_low]
+```
+
+```{r}
+#install.packages("gridExtra")
+data.frame(matriz_ttest_pval)
+library(gridExtra)
+png("top20.png", height = 100*nrow(matriz_ttest_pval), width = 700*ncol(matriz_ttest_pval), res = 300)
+grid.table(matriz_ttest_pval)
+dev.off()
+
+```
+
+```{r}
+#install.packages(“gplots”, dependencies=TRUE)
+library("gplots") # load
+index_order_class <- order(tcga_coadread_class)
+row_colors <- c(rep("orange",length(de_genes_high)), rep("darkviolet",length(de_genes_low)))
+col_colors <- ifelse(tcga_coadread_class[index_order_class] == "Young","darkviolet","orange")
+aux_mat <- tcga_coadread[c(de_genes_high, de_genes_low), index_order_class]
+heatmap.2(aux_mat)
+```
+Para mejorar la visualización, escalamos los valores de expresión con la función scale, la cual hace una transformación z. Definimos el rango de colores y la cantidad de particiones de color (breaks) para tener un buen balance de valor de expresión y color. El heatmap se genera con la función heatmap.2. También agregamos colores para visualizar el tipo de muestra en las columnas (azul para joven, rojo para adulto
+mayor) y los genes diferencialmente expresados por renglón (rojo para alto y azul para bajo).
+
+```{r}
+aux_mat <- t(apply(aux_mat, 1, scale))
+colnames(aux_mat) <- colnames(tcga_coadread)
+colors_h <- colorRampPalette(c("deeppink4","white","darkorange"))(8)
+h_breaks <- seq(from=-2, to=2, length=9)
+heatmap.2(aux_mat, col=colors_h, trace="none", breaks=h_breaks, labRow=rownames(aux_mat), labCol="",
+ColSideColors = col_colors, RowSideColors = row_colors)
+```
+
+Si observamos las ramas del agrupamiento jerárquico en columnas, se distingue que no hay una clara separación entre jóvenes y adultos mayores, ya que se forman pequeños grupos pero no están apartados. En cambio para los genes diferencialmente expresados en renglones, la separación es obvia.
+También podemos hacer el heatmap sin el cluster jerárquico para ver si detectamos patrones. Agregamos un separador de columnas y renglones para distinguir el tipo de muestra y genes diferencialmente expresados. De esta manera se distingue un poco más los patrones de expresión.
+```{r}
+tiff("heatmap.png", units="in", width=5, height=5, res=300)
+par(cex.main=0.8)
+heatmap.2(aux_mat, col=colors_h, trace="none", breaks=h_breaks, labRow=rownames(aux_mat), cexRow=0.75, labCol="", xlab = "Muestras", ylab = "Genes", main = "Expresión diferencial más significativa", dendrogram='none', ColSideColors = col_colors, RowSideColors = row_colors, Rowv=F, Colv=F, colsep = length(which(tcga_coadread_class == "Old")), rowsep=length(de_genes_high), sepcolor = "black")
+dev.off()
+```

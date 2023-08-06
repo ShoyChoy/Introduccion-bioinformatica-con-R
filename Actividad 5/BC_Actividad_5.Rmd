@@ -1,0 +1,144 @@
+---
+title: "Actividad 5"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+El objetivo de esta actividad es conocer las bases de datos de mutaciones. Para ello consultarás dos bases de datos, COSMIC (https://cancer.sanger.ac.uk/cosmic), que contiene mutaciones relacionadas a cáncer, y gnomAD (https://gnomad.broadinstitute.org/), que contiene mutaciones en personas sanas y enfermedades. Se espera que adquieras la habilidad para manejar la información que ofrecen estas bases de datos.
+
+
+Leer los datos de COSMIC
+
+```{r}
+#load file
+library(readxl)
+setwd("C:\\Users\\Choy\\Documents\\Semestre 2\\Análisis de biología computacional")
+cosmic <- read_excel("Gene_samples.xlsx")
+head(cosmic)
+```
+
+```{r}
+dim(cosmic)
+names(cosmic)
+```
+
+Filtrar mutaciones por ciertos parámetros:
+a) Tipo de muestra “Sample.Type”, conservar “Tumour Sample”
+```{r}
+table(cosmic$Sample_Type)
+```
+
+```{r}
+cosmic <- cosmic[which(cosmic$Sample_Type == "Tumour Sample"),]
+```
+
+```{r}
+dim(cosmic)
+```
+
+b) Estatus somático, quitar las variantes de origen desconocido
+```{r}
+table(cosmic$Somatic_Status)
+```
+
+```{r}
+cosmic <- cosmic[-which(cosmic$Somatic_Status == "Variant of unknown origin"),]
+dim(cosmic)
+```
+
+Leer los datos de gnomAD
+```{r}
+setwd("C:\\Users\\Choy\\Documents\\Semestre 2\\Análisis de biología computacional")
+gnomAD <- read_excel("gnomAD_v2.1.1_ENSG00000133703_2020_03_18_08_52_58.xlsx")
+```
+
+```{r}
+dim(gnomAD)
+names(gnomAD)
+```
+
+Recordar que gnomAD tiene datos de población latina, lo cual nos puede servir para hacer comparaciones
+```{r}
+table(gnomAD$Annotation)
+```
+
+Para poder comparar la locación de las mutaciones en cosmic con las de gnomAD, tenemos que agregar variables a la tabla de cosmic.
+```{r}
+aux_loc <- unlist(strsplit(x=cosmic$Genomic_Coordinates,split=":"))[seq(from=2, to=nrow(cosmic)*2, by=2)]
+```
+
+```{r}
+aux_loc[1:5]
+length(aux_loc)
+```
+
+```{r}
+aux_loc2 <- unlist(strsplit(x=aux_loc, split="\\.\\."))
+```
+
+```{r}
+aux_loc2[1:5]
+length(aux_loc2)
+```
+
+Los elementos impares son el inicio de la locación de la mutación y los elementos pares son el final
+```{r}
+cosmic$start <- aux_loc2[seq(from=1, to=nrow(cosmic)*2, by=2)]
+cosmic$end <- aux_loc2[seq(from=2, to=nrow(cosmic)*2, by=2)]
+```
+
+Podemos comparar la cantidad de locaciones de variantes diferentes que tienen cada base de datos.
+```{r}
+cosmic_pos <- sort(as.numeric(unique(c(cosmic$start, cosmic$end))))
+gnomAD_pos <- sort(unique(gnomAD$Position))
+```
+
+Los rangos de regiones del gen son similares entre las 2, aunque un poco más grande en gnomAD.
+```{r}
+range(cosmic_pos)
+```
+
+```{r}
+range(gnomAD_pos)
+```
+
+```{r}
+diff(range(cosmic_pos))
+```
+
+```{r}
+diff(range(gnomAD_pos))
+```
+
+¿Cuáles son las más frecuentes en gnomad?
+
+```{r}
+unique(gnomAD$"Allele Count")
+```
+
+En gnomAD, 3 mutaciones tienen una frecuencia de alelos mayor a 1000
+```{r}
+gnomAD[which(gnomAD$'Allele Count' > 1000),c(1:5,9,10,12,14:16)]
+```
+
+En cosmic, 6 mutaciones están presentes en más de 1000 pacientes
+```{r}
+data.frame(sort(table(cosmic$AA_Mutation),decreasing = T))
+```
+
+Mutaciones en cosmic presentes en más de 1000 muestras
+```{r}
+cosmic[c(5174,5177,615,19968,5175,19970),c(1,2,4,6,7,9,16,17,19:21)]
+```
+
+De estas variantes, la única presente en gnomAD, está en la locación 25398284, no es tan frecuente y es diferente a las de cosmic.
+```{r}
+gnomAD[which(gnomAD$Position == 25398284),c(1:5,9,10,12,14:16)]
+```
+
+Por otro lado, de las 3 más frecuentes en gnomAD, sólo una también está en cosmic, pero también es diferente, cambio de G a A
+```{r}
+cosmic[which(cosmic$start %in% c(253627777,25362854,25368462))[1],]
+```
+

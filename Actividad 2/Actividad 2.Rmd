@@ -1,0 +1,373 @@
+---
+title: "Actividad 2"
+output:
+  pdf_document: default
+  html_notebook: default
+  html_document:
+    df_print: paged
+  word_document: default
+---
+
+EJERCICIO 1
+
+Carga del archivo
+```{r}
+setwd("C:\\Users\\Choy\\Documents\\Semestre 2\\Análisis de biología computacional")
+pacientes <- read.csv("9_PACIENTES_DE_NUEVO_INGRESO.csv")
+head(pacientes)
+summary(pacientes)
+```
+Revisión de errores y limpieza
+
+El archivo contenía caracteres extraños en lugar de las vocales acentuadas en mayúsucula, y también en lugar de la Ñ. Además en un diagnóstico se escribió "BDEL" en lugar de "DEL". 
+
+Podemos arreglar esto con gsub.
+
+```{r}
+pacientes$MUNICIPIO<-gsub("¥","Ñ",pacientes$MUNICIPIO)
+pacientes$MUNICIPIO<-gsub("à","Ó",pacientes$MUNICIPIO)
+pacientes$MUNICIPIO<-gsub("µ","Á",pacientes$MUNICIPIO)
+pacientes$MUNICIPIO<-gsub("","É",pacientes$MUNICIPIO)
+pacientes$MUNICIPIO<-gsub("Ö","Í",pacientes$MUNICIPIO)
+pacientes$MUNICIPIO<-gsub("é","Ú",pacientes$MUNICIPIO)
+pacientes$ESTADO<-gsub("Ö","Í",pacientes$ESTADO)
+pacientes$DESCRIPCION.DIAGNOSTICO<-gsub("BDEL","DEL",pacientes$DESCRIPCION.DIAGNOSTICO)
+pacientes$DESCRIPCION.DIAGNOSTICO<-gsub("¥","Ñ",pacientes$DESCRIPCION.DIAGNOSTICO)
+```
+
+
+Hay registrados 138 diagnósticos diferentes
+```{r}
+#install.packages("janitor")
+library(janitor)
+diagnosticos<-tabyl(pacientes$DESCRIPCION.DIAGNOSTICO)
+diagnosticos2<-unique(pacientes$DESCRIPCION.DIAGNOSTICO)
+diagnosticos2
+```
+
+Pero para saber cuántos de ellos son tumores, usaremos el siguiente código
+```{r}
+#Lo siguiente es una maroma muy loca, se optó mejor por utilizar el código sugerido
+# library(dplyr)
+# tumores <- filter(pacientes, grepl("TUMOR", DESCRIPCION.DIAGNOSTICO)) # filtrar solo tumores
+# tumores <- tumores[,6] # conservar solo la columna "DESCRIPCION.DIAGNOSTICO"
+# tipos_tumores = c() # crear nuevo vector vacío para almacenar cada tipo de tumor
+# # en el siguiente ciclo, se añadirán los tipos de tumor a tipos_tumores siempre y cuando no se hayan añadido antes
+# for (i in tumores)
+#   if (!(i %in% tipos_tumores))
+#     tipos_tumores <- append(tipos_tumores, i)
+# #finalmente, el total de tupos de tumores es igual al número de elementos en tipos_tumores
+# total <- length(tipos_tumores)
+# print(paste0("Total de tipos de tumores: ", total))
+tumores<- pacientes[grep("TUMOR", pacientes$DESCRIPCION.DIAGNOSTICO),]
+length(unique(tumores$DESCRIPCION.DIAGNOSTICO))
+```
+
+Los 10 estados con el mayor número de casos son los siguientes
+```{r}
+estados<-tabyl(pacientes$ESTADO)
+frec_estados <-estados[order(-estados$n),]
+x<-frec_estados[1:10,]
+x
+```
+Y 10 los municipios son:
+```{r}
+municipios<-tabyl(pacientes$MUNICIPIO)
+frec_municipios <-municipios[order(-municipios$n),]
+y<-frec_municipios[1:10,]
+y
+```
+
+Reporta cuántos tumores de colon o recto encuentras, si son de pacientes jóvenes y en cuál estado y municipio existe el mayor número de casos
+```{r}
+library(dplyr)
+tumor_recto_colon <- sum(pacientes[,6]=="TUMOR MALIGNO DEL RECTO",pacientes[,6]=="TUMOR MALIGNO DEL COLON",pacientes[,6]=="TUMOR BENIGNO DEL COLON DEL RECTO Y DEL CONDUCTO ANAL Y DEL ANO",pacientes[,6]=="TUMOR MALIGNO DE LA UNION RECTOSIGMOIDEA")
+print(paste0("Total de casos de tumores de colon o recto: ", tumor_recto_colon))
+
+colnames(pacientes)
+tabla <- filter(pacientes, DESCRIPCION.DIAGNOSTICO == "TUMOR MALIGNO DEL RECTO" | DESCRIPCION.DIAGNOSTICO == "TUMOR MALIGNO DEL COLON" | DESCRIPCION.DIAGNOSTICO == "TUMOR BENIGNO DEL COLON DEL RECTO Y DEL CONDUCTO ANAL Y DEL ANO"| DESCRIPCION.DIAGNOSTICO == "TUMOR MALIGNO DE LA UNION RECTOSIGMOIDEA")
+
+tabla 
+
+estado<-tabyl(tabla$ESTADO)
+frec_estado <-estado[order(-estado$n),]
+print("Estados con más casos")
+frec_estado[1:10,]
+
+municipio<-tabyl(tabla$MUNICIPIO)
+frec_municipio <-municipio[order(-municipio$n),]
+print("Municipios con más casos")
+frec_municipio[1:10,]
+
+tabla2 <- filter(tabla, EDAD < 50)
+print(paste0("Total de casos de tumores de colon o recto en pacientes menores de 50 años: ", nrow(tabla2)))
+tabla2
+```
+
+Visualizaciones
+
+Gráfica de barras sobre estados con más casos
+
+```{r}
+library(ggplot2)
+frec_estados[,1] <- factor(frec_estados[,1], levels = frec_estados[,1][order(-frec_estados$n)])
+p <- ggplot(frec_estados[1:10,])
+p <- p + aes(x = frec_estados[1:10,1], y = frec_estados[1:10,2]) + geom_bar(stat="identity", fill="#231975") 
+p <- p + ggtitle("Top 10 de estados con más casos de tumores") + xlab("Estado") + ylab("No. casos")
+p <- p + theme_bw()
+p
+```
+
+Gráfica de caja sobre casos de tumores colorrectales en personas de diferentes edades
+```{r}
+library(ggplot2)
+
+names(tabla)[names(tabla)=="DESCRIPCION.DIAGNOSTICO"]<- "Diagnóstico"
+
+summary(tabla)
+tabla$Diagnóstico<-gsub("TUMOR MALIGNO DEL RECTO","Tum. maligno del recto",tabla$Diagnóstico)
+tabla$Diagnóstico<-gsub("TUMOR MALIGNO DEL COLON","Tum. maligno del colon",tabla$Diagnóstico)
+tabla$Diagnóstico<-gsub("TUMOR BENIGNO DEL COLON DEL RECTO Y DEL CONDUCTO ANAL Y DEL ANO","Tum. benigno colon/recto/ano",tabla$Diagnóstico)
+tabla$Diagnóstico<-gsub("TUMOR MALIGNO DE LA UNION RECTOSIGMOIDEA","Tum. maligno de la u. rectosigmoidea",tabla$Diagnóstico)
+
+
+box <- ggplot(data=tabla, aes(x=Diagnóstico, y=EDAD))
+box + geom_boxplot(aes(fill=Diagnóstico)) + 
+  ylab("Edad (años)") + ggtitle("Aparición de tumores colorrectales por edad") + theme(
+    axis.text.x = element_text(size =4.7)
+  ) + scale_fill_manual(values=c("#ff0033", "#ff0066", "#ff6600","#ff3300"))
+```
+
+Gráfica de pastel sobre sexo de los casos
+```{r}
+x <- c(1692,1119)
+lbls <- c("femenino", "masculino")
+pie(x, labels = lbls, main = "SEXO", col = c("pink", "blue"))
+```
+
+```{r}
+coloRectal = pacientes %>%
+  filter(DESCRIPCION.DIAGNOSTICO == "TUMOR MALIGNO DEL RECTO" | 
+         DESCRIPCION.DIAGNOSTICO == "TUMOR MALIGNO DEL COLON" | 
+         DESCRIPCION.DIAGNOSTICO == "TUMOR BENIGNO DEL DEL COLON DEL RECTO Y DEL CONDUCTO ANAL Y DEL ANO" |
+         DESCRIPCION.DIAGNOSTICO == "TUMOR MALIGNO DE LA UNION RECTOSIGMOIDEA")
+
+#Comparando las tres especies, por Sepal Width
+histogram <- ggplot(data=coloRectal, aes(x=EDAD))
+histogram + geom_histogram(binwidth=2, color="black", aes(fill=SEXO)) + 
+  xlab("Edad") +  ylab("Frecuencia") + ggtitle("Cáncer colorectal por edad")
+```
+
+Grafica que muestra los casos de tumores colorrectales por estado
+```{r}
+coloRectal = pacientes %>%
+  filter(DESCRIPCION.DIAGNOSTICO == "TUMOR MALIGNO DEL RECTO" | 
+         DESCRIPCION.DIAGNOSTICO == "TUMOR MALIGNO DEL COLON" | 
+         DESCRIPCION.DIAGNOSTICO == "TUMOR BENIGNO DEL COLON DEL RECTO Y DEL CONDUCTO ANAL Y DEL ANO" |
+         DESCRIPCION.DIAGNOSTICO == "TUMOR MALIGNO DE LA UNION RECTOSIGMOIDEA")
+
+ggplot(coloRectal, aes(x = ESTADO, fill = DESCRIPCION.DIAGNOSTICO)) +
+  geom_bar(position = "dodge") + xlab("Estados") + ylab("Casos cancer de colon") + ggtitle("Casos de cancer de colon por estado")
+```
+
+Ejercicio 2
+
+Carga del archivo
+```{r}
+setwd("C:\\Users\\Choy\\Documents\\Semestre 2\\Análisis de biología computacional")
+load("Multi_Cancer_Data.RData")
+```
+
+```{r}
+dim(multi_cancer_data)
+tumor <- table(grepl("Tumor",colnames(multi_cancer_data)))
+tumor
+```
+
+
+```{r}
+Promedio_Tumor <- rowMeans(multi_cancer_data[,1:190])
+Promedio_Normal <- rowMeans(multi_cancer_data[,191:280])
+Diferencia<- abs(Promedio_Normal-Promedio_Tumor)
+tumordata <- data.frame(Promedio_Tumor,Promedio_Normal,Diferencia)
+tumordata
+```
+
+Los siguientes genes son los que se expresan con mayor diferencia entre tumores y tejidos normales.
+```{r}
+top_dif <-tumordata[order(-tumordata$Diferencia),]
+d<-top_dif[1:20,]
+d
+```
+Observación: para las siguientes comparaciones tomaremos un tipo de cáncer y lo contrastaremos con cómo se expresan los genes en el tejido en estado normal, donde se presenta. Por ejemplo, no podemos pretender usar el tejido del cerebelo para buscar un tumor de recto.
+
+La siguiente tabla compara la leucemia con la expresión de su respectivo tejido normal, germinal.
+```{r}
+datos2 <- as_tibble(multi_cancer_data)
+Promedio_Leucemia = rowMeans(select(datos2, starts_with("Tumor__Leukemia")))
+Promedio_Germinal = rowMeans(select(datos2, starts_with("Normal__Germinal")))
+Diferencia_Leu<- abs(Promedio_Leucemia-Promedio_Germinal)
+Muestra <- rownames(multi_cancer_data)
+leucemiadata<- data.frame (Promedio_Leucemia, Promedio_Germinal,Diferencia_Leu)
+
+rownames(leucemiadata)<-Muestra
+leucemiadata
+
+```
+Las 20 dferencias en las expresiones de genes más grandes entre la leucemia y el germinal son:
+```{r}
+top_dif_leu<-leucemiadata[order(-leucemiadata$Diferencia_Leu),]
+e<-top_dif_leu[1:20,]
+e
+
+```
+
+Ahora revisaremos si hay coincidencias entre las 20 diferencias generales más grandes y las 20 diferencias de expresión de la leucemia con su respectivo normal
+```{r}
+common <- intersect(rownames(e), rownames(d))  
+common
+```
+La siguiente tabla compara la meduloblastoma con la expresión de su respectivo tejido normal, cerebellum.
+```{r}
+Promedio_Medulloblastoma = rowMeans(select(datos2, starts_with("Tumor__CNS_Medulloblastoma")))
+Promedio_Cerebellum = rowMeans(select(datos2, starts_with("Normal__Cerebellum")))
+Diferencia_M<- abs(Promedio_Medulloblastoma-Promedio_Cerebellum)
+
+medullobastoma_data<- data.frame (Promedio_Medulloblastoma, Promedio_Cerebellum,Diferencia_M)
+
+rownames(medullobastoma_data)<-Muestra
+medullobastoma_data
+
+```
+
+
+Las 20 dferencias en las expresiones de genes más grandes entre la meduloblastoma y el cerebelo son:
+
+```{r}
+top_dif_m<-medullobastoma_data[order(-medullobastoma_data$Diferencia_M),]
+m<-top_dif_m[1:20,]
+m
+
+```
+Ahora revisaremos si hay coincidencias entre las 20 diferencias generales más grandes y las 20 diferencias de expresión del meduloblastoma con su respectivo normal
+```{r}
+common <- intersect(rownames(m), rownames(d))  
+common
+```
+
+La siguiente tabla compara el linfoma con la expresión de su respectivo tejido normal, la sangre periférica.
+```{r}
+
+select_tumor <- select(datos2, starts_with("Tumor__Lymphoma"))
+Promedio_Lymphoma = rowMeans(select_tumor)
+
+select_normal <- select (datos2, starts_with("Normal__Peripheral"))
+Promedio_Sangre_Per= rowMeans(select_normal)
+
+Diferencia_Lymphoma <- abs(Promedio_Sangre_Per-Promedio_Lymphoma)
+Muestra_lymphoma <- rownames(multi_cancer_data)
+
+Muestral <- rownames(multi_cancer_data)
+lymphoma_data <- data.frame(Promedio_Lymphoma, Promedio_Sangre_Per, Diferencia_Lymphoma)
+
+
+rownames(lymphoma_data) <- Muestral 
+lymphoma_data
+
+```
+
+Las 20 diferencias en las expresiones de genes más grandes entre el linfoma y su respectivo tejido normal son:
+```{r}
+top_dif_lymphoma <- lymphoma_data[order(-lymphoma_data$Diferencia_Lymphoma),]
+lim<-top_dif_lymphoma[1:20,]
+lim
+```
+
+
+Ahora revisaremos si hay coincidencias entre las 20 diferencias generales más grandes y las 20 diferencias de expresión del linfoma con su respectivo normal
+```{r}
+common <-intersect(rownames(lim), rownames(d))
+common
+```
+
+Lo siguiente es la comparación entre el gliblastoma y el tejido normal del cerebro
+```{r}
+data <- as_tibble(multi_cancer_data)
+
+means_tumor_gliblastoma <- data %>%
+  select(contains("glioblastoma") & contains("Tumor")) %>%
+  rowMeans
+
+means_normal_gliblastoma <- data %>%
+  select(contains("Whole_brain") & contains("Normal")) %>%
+  rowMeans
+
+diferencias_cerebro <- abs(means_normal_gliblastoma - means_tumor_gliblastoma)
+
+matriz_comparacion <- matrix(c(rownames(multi_cancer_data), 
+                               means_tumor_gliblastoma, 
+                               means_normal_gliblastoma, 
+                               diferencias_cerebro), 
+                             nrow = length(means_normal_gliblastoma))
+colnames(matriz_comparacion) <- c("gen", "medias_tumor", "medias_normal", "diferencia")
+
+top20_glioblastoma <- as_tibble((matriz_comparacion[order(as.double(matriz_comparacion[,4]), decreasing = TRUE),])[1:20,])
+
+top20_glioblastoma
+```
+
+```{r}
+
+# GENERAL ####
+
+means_tumores <- rowMeans(select(data, starts_with("Tumor")))
+means_normales <- rowMeans(select(data, starts_with("Normal")))
+diferencias_general <- abs(means_tumores - means_normales)
+
+matriz_general <- matrix(c(rownames(multi_cancer_data), 
+                                means_tumores, 
+                                means_normales, 
+                                diferencias_general), 
+                              nrow = length(means_tumores))
+colnames(matriz_general) <- c("gen", "medias_tumor", "medias_normal", "diferencias")
+top20_general <- as_tibble((matriz_general[order(as.double(matriz_general[,4]), decreasing = TRUE),])[1:20,])
+
+(intersect(top20_general[,1], top20_glioblastoma[,1]))  # 1 coincidencia: Surfacant Protein Sp-A2 Delta_HG3925-HT4195_at
+```
+Este gen es el noveno con mayor diferencia de expresión respecto al glioblastoma, y el 14vo en la tabla de posiciones de diferencias de expresión en general.
+
+Por último, se compara el tumor colorrectal con la expresión de su respectivo tejido normal.
+
+```{r}
+Promedio_Colorectal = rowMeans(select(datos2, starts_with("Tumor__Colorectal")))
+
+Promedio_Colon = rowMeans(select(datos2, starts_with("Normal__Colon")))
+
+Diferencia_colon <- abs(Promedio_Colorectal - Promedio_Colon)
+
+colon_data <- data.frame(Promedio_Colorectal, Promedio_Colon, Diferencia_colon)
+
+rownames(colon_data) <- Muestra
+colon_data
+```
+
+
+Las 20 diferencias en las expresiones de genes más grandes entre el Tumor Colorrectal y el normal son:
+```{r}
+top_dif_colon <- colon_data[order(-colon_data$Diferencia_colon),]
+e_colon <- top_dif_colon[1:20,]
+e_colon
+
+```
+
+
+En busca de coincidencias entre las 20 diferencias generales mas grandes y las 20 diferencias de la expresión del Tumor Colorrectal con su respectivo normal
+
+```{r}
+common <- intersect(rownames(e_colon), rownames(d))
+common
+```
+
+Ni respecto al tumor en el colon, la leucemia, el linfoma o el meduloblastoma hubo coincidencias entre las 20 diferencias de expresión de gen más grandes y el top 20 general.
+
+

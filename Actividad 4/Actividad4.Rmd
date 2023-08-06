@@ -1,0 +1,247 @@
+---
+title: "Actividad 4"
+output:
+  pdf_document: default
+  html_notebook: default
+  html_document:
+    df_print: paged
+---
+
+Definimos la opcion para que no se lean los strings como factores. 
+
+```{r}
+options(stringsAsFactors=F)
+```
+
+Carga del archivo
+```{r}
+setwd("C:\\Users\\Choy\\Documents\\Semestre 2\\Análisis de biología computacional")
+load("TCGA_COADREAD_comp_data.RData")
+```
+
+Qué contiene este Rdata
+Se cargan dos objetos tcga_coadread que contiene datos rnaseq (secuencias de RNA) con la expresion de genes y tcga coadread class con la clasificación de muestras entre old y young.
+
+```{r}
+ls()
+```
+
+```{r}
+tcga_coadread[1:5,1:3]
+#data.frame(tcga_coadread)
+```
+
+```{r}
+tcga_coadread_class[1:10]
+```
+
+```{r}
+as.data.frame(table(tcga_coadread_class))
+```
+
+Obtener genes diferencialmente expresados con una prueba t Student y la diferencia de medias
+
+Calculamos la diferencia entre las medias tal como lo hicimos en la Actividad 2, primero obtendremos los índices para cada tipo de muestra y luego hacemos el cálculo
+
+```{r}
+y_muestras<-which(tcga_coadread_class=="Young")
+o_muestras<-which(tcga_coadread_class=="Old")
+```
+
+Definimos la matriz para el cálculo de diferencias entre medias
+
+```{r}
+matriz_medias<- matrix(NA, nrow=nrow(tcga_coadread), ncol=3,
+dimnames=list(rownames(tcga_coadread),c("Young","Old", "Diferencia")))
+matriz_medias[1:5,]
+```
+
+La siguiente será la matriz que además de las diferencias, mostrará los p values y el FC.
+
+```{r}
+matriz_ttest <- matrix(NA, nrow=nrow(tcga_coadread), ncol=4,
+dimnames=list(rownames(tcga_coadread),c("Young","Old", "P value", "Fold change")))
+matriz_ttest[1:5,]
+```
+Corremos un ciclo for para obtener los promedios y sus diferencias para cada gen.
+```{r}
+for(i in 1:nrow(tcga_coadread)){
+  media_young <- mean(tcga_coadread[i, y_muestras])
+  media_old <- mean(tcga_coadread[i, o_muestras])
+  aux_diferencia <- abs(media_young-media_old)
+  matriz_medias[i,] <- c(media_young, media_old, aux_diferencia)
+}
+matriz_medias[1:5,]
+```
+
+
+Corremos un ciclo for para obtener los promedios, sus diferencias, el p value y el fold change para cada gen
+```{r}
+for(i in 1:nrow(tcga_coadread)){
+  media_young <- mean(tcga_coadread[i, y_muestras])
+  media_old <- mean(tcga_coadread[i, o_muestras])
+  p_value <- t.test(tcga_coadread[i, y_muestras], tcga_coadread[i, o_muestras])$p.value
+  fold_change <- media_young -media_old
+  matriz_ttest[i,] <- c(media_young, media_old,p_value, fold_change)
+}
+matriz_ttest[1:5,]
+```
+
+```{r}
+#data.frame(matriz_ttest)
+head(matriz_ttest)
+```
+
+Mayores diferencias
+
+```{r}
+top_dif<-matriz_medias[order(-data.frame(matriz_medias)$Diferencia),]
+#data.frame(top_dif)[1:50,]
+head(top_dif)
+```
+
+ P values más pequeños, significativos.
+```{r}
+top_p_value<-matriz_ttest[order(data.frame(matriz_ttest)$P.value),]
+#data.frame(top_p_value)[1:50,]
+head(top_p_value)
+```
+
+Algunos genes tienen muy poca expresión (como el TBC1D3P2), así que los descriminaremos de nuestro análisis.
+
+```{r}
+index_filter_exp <- which(apply(matriz_ttest[,1:2], 1, function(x) all(x < 1)))
+matriz_medias <- matriz_medias[-index_filter_exp,]
+matriz_ttest <- matriz_ttest[-index_filter_exp,]
+```
+
+¿Hay coincidencias entre aquellos genes con menor p value y aquellos genes con mayor diferencia de expresión? Haremos una revisión de los primeros 50 de cada lista.
+
+```{r}
+coincidencias<-intersect(rownames(top_dif)[1:50],rownames(top_p_value)[1:50])
+coincidencias
+```
+```{r}
+matriz_index<- matrix(NA, nrow=length(coincidencias), ncol=2,
+dimnames=list(coincidencias,c("Índice Top Diferencias", "Índice menor P value")))
+matriz_index[1:5,]
+```
+
+
+```{r}
+for(i in 1:length(coincidencias)){
+  index_top_dif <- which(rownames(top_dif)==coincidencias[i])
+  index_top_p_value <-which(rownames(top_p_value)==coincidencias[i])
+  matriz_index[i,] <- c(index_top_dif, index_top_p_value)
+}
+matriz_index
+```
+De la tabla anterior parecería muy interesante poner atención a genes como el GATA4, el PCSK1N, el PIWIL1, el PRND O el FZD9, ya que la brecha entre su expresión en jóvenes y adultos mayores es grande y simultáneamente su p value es significativo. Sin embargo, también falta por comparar con el Fold change.
+
+Haremos una selección más fina de genes, tomando a aquellos cuyo p value es menor a 0.01 (estrictamente significativos), y después los clasificaremos según si están sobreexpresados (positivos) o subexpresados (negativos) utilizando el Foldchange.
+
+Definimos la matriz “matriz_ttest_pval” para tener los genes ordenados por p-value.
+```{r}
+index_order_pvals <- order(abs(matriz_ttest[,"P value"]))
+
+matriz_ttest_pval <- matriz_ttest[index_order_pvals,]
+
+index_de_high <- which(matriz_ttest_pval[,"P value"] < 0.01 & matriz_ttest_pval[,"Fold change"] > 0)
+de_genes_high <- rownames(matriz_ttest_pval)[index_de_high]
+
+index_de_low <- which(matriz_ttest_pval[,"P value"] < 0.01 & matriz_ttest_pval[,"Fold change"] < 0)
+de_genes_low <- rownames(matriz_ttest_pval)[index_de_low]
+```
+
+Al graficar un heatmap (mapa de calor) podemos ver el comportamiento de los genes diferencialmente expresados y las muestras por clase. Para hacer el heatmap necesitamos el paquete gplots. 
+Guardamos en una matriz auxiliar los datos de los genes diferencialmente expresados (alto y bajo) ordenados por tipo de muestra.
+```{r}
+#install.packages(“gplots”, dependencies=TRUE)
+library("gplots") # load
+index_order_class <- order(tcga_coadread_class)
+row_colors <- c(rep("red",length(de_genes_high)), rep("blue",length(de_genes_low)))
+col_colors <- ifelse(tcga_coadread_class[index_order_class] == "Young","blue","red")
+aux_mat <- tcga_coadread[c(de_genes_high, de_genes_low), index_order_class]
+heatmap.2(aux_mat)
+```
+Para mejorar la visualización, escalamos los valores de expresión con la función scale, la cual hace una transformación z. Definimos el rango de colores y la cantidad de particiones de color (breaks) para tener un buen balance de valor de expresión y color. El heatmap se genera con la función heatmap.2. También agregamos colores para visualizar el tipo de muestra en las columnas (azul para joven, rojo para adulto
+mayor) y los genes diferencialmente expresados por renglón (rojo para alto y azul para bajo).
+
+```{r}
+aux_mat <- t(apply(aux_mat, 1, scale))
+colnames(aux_mat) <- colnames(tcga_coadread)
+colors_h <- colorRampPalette(c("darkblue","white","darkred"))(8)
+h_breaks <- seq(from=-2, to=2, length=9)
+heatmap.2(aux_mat, col=colors_h, trace="none", breaks=h_breaks, labRow="", labCol="",
+ColSideColors = col_colors, RowSideColors = row_colors)
+```
+
+Si observamos las ramas del agrupamiento jerárquico en columnas, se distingue que no hay una clara separación entre jóvenes y adultos mayores, ya que se forman pequeños grupos pero no están apartados. En cambio para los genes diferencialmente expresados en renglones, la separación es obvia.
+También podemos hacer el heatmap sin el cluster jerárquico para ver si detectamos patrones. Agregamos un separador de columnas y renglones para distinguir el tipo de muestra y genes diferencialmente expresados. De esta manera se distingue un poco más los patrones de expresión.
+```{r}
+heatmap.2(aux_mat, col=colors_h, trace="none", breaks=h_breaks, labRow="", labCol="", dendrogram='none', ColSideColors = col_colors, RowSideColors = row_colors, Rowv=F, Colv=F, colsep = length(which(tcga_coadread_class == "Old")), rowsep=length(de_genes_high), sepcolor = "black")
+```
+Podemos imprimir los genes diferencialmente expresados en pantalla o en un archivo de texto, con la función write.table, para hacer el análisis de funciones de los genes usando la herramienta MSigDB ¿tal como lo vimos en clase? En este caso imprimimos algunos en pantalla, pero se puede pasar a un archivo de texto especificando el parámetros “file”.
+
+Analizaremos con MSigDB los 153 genes de la lista de sobreexpresados.
+
+```{r}
+length(de_genes_high)
+write.table(de_genes_high[1:153], sep="\t", quote=F, row.names=F, col.names=F)
+```
+Lo obtenido más relevante es lo siguiente:
+
+GSE29618_PRE_VS_DAY7_POST_TIV_FLU_VACC
+ACCINE_PDC_UP [200]
+
+Genes regulados al alza en comparación de las células dendríticas plasmacitoides (pDC) de la vacunación contra la influenza TIV antes de la vacunación versus las del día 7 después de la vacunación.
+
+GSE9988_LPS_VS_LOW_LPS_MONOCYTE_UP [188]
+
+
+Genes regulados al alza en comparación de monocitos tratados con 5000 ng / ml de LPS (agonista de TLR4) versus aquellos tratados con 1 ng / ml de LPS (agonista de TLR4).
+
+GSE360_L_MAJOR_VS_T_GONDII_DC_UP [197]
+
+Genes sobre-regulados en comparación con las células dendríticas (DC) expuestas a L. major versus DC expuestas a T. gondii.
+
+Posteriormente hacemos lo mismo con los subexpresados, que son 60.
+```{r}
+length(de_genes_low)
+write.table(de_genes_low[1:60], sep="\t", quote=F, row.names=F, col.names=F)
+```
+Y las coincidencias más grandes están en los siguientes sets de genes
+
+GSE14000_UNSTIM_VS_4H_LPS_DC_TRANSLATE
+ATED_RNA_DN [197]
+
+Genes regulados negativamente en comparación del ARNm unido al polisoma (traducido) antes y 4 h después de la estimulación con LPS (agonista de TLR4).
+
+HALLMARK_TNFA_SIGNALING_VIA_NFKB [200]
+
+Genes regulados por NF-kB en respuesta a TNF [GeneID = 7124].
+
+GSE41978_ID2_KO_VS_BIM_KO_KLRG1_LOW_EF
+_EFFECTOR_CD8_TCELL_UP [199]
+
+Genes sobrerregulados en KLRG1 bajo [GeneID = 10219] células efectoras T CD8 durante la infección: knockout ID2 [GeneID = 10219] versus BCL2L11 [GeneID = 10018] knockout.
+
+Por último, si nuestra búsqueda de MsigDB la hacemos con tanto los genes sobreexpresados como los subexpresados, tenemos los siguientes set de genes:
+
+GSE29618_PRE_VS_DAY7_POST_TIV_FLU_VACC
+ACCINE_PDC_UP [200]
+
+Genes regulados al alza en comparación de las células dendríticas plasmacitoides (pDC) de la vacunación contra la influenza TIV antes de la vacunación versus las del día 7 después de la vacunación.
+
+GSE42021_TCONV_PLN_VS_CD24HI_TCONV_THY
+THYMUS_UP [200]
+
+Genes sobrerregulados en T conv: ganglios linfáticos periféricos versus tímico CD24 alto [GeneID = 100133941].
+
+GSE22025_UNTREATED_VS_TGFB1_TREATED_CD
+_CD4_TCELL_UP [199]
+
+Genes regulados al alza en células T CD4 [GeneID = 920]: sin tratar versus TGFB1 [GeneID = 7040].
+
+
+
