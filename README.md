@@ -26,6 +26,6 @@ Este trabajo es el producto final de la clase. La finalidad del proyecto es elab
 
 ![](https://github.com/ShoyChoy/Introduccion-bioinformatica-con-R/blob/main/heatmap%20expresi%C3%B3n%20g%C3%A9nica.jpg)
 
-<div style="text-align:center">
-    <img src="https://github.com/ShoyChoy/Introduccion-bioinformatica-con-R/blob/main/heatmap%20expresi%C3%B3n%20g%C3%A9nica.jpg" alt="heatmap" />
-</div>
+<p align="center">
+  <img src="https://github.com/ShoyChoy/Introduccion-bioinformatica-con-R/blob/main/heatmap%20expresi%C3%B3n%20g%C3%A9nica.jpg" />
+</p>
