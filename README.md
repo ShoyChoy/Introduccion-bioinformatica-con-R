@@ -22,4 +22,8 @@ El objetivo de la actividad es conocer bases de datos de mutaciones. Se consulta
 
 ### Situación problema
 
-Este trabajo es el producto final de la clase. La finalidad del proyecto es elaborar un análisis de datos a de la información genética en pacientes que padezcan de cáncer de colon y de aquellos en condiciones normales para discernir patrones que permitan la detección temprana de este tipo de cáncer en pacientes jóvenes. 
+Este trabajo es el producto final de la clase. La finalidad del proyecto es elaborar un análisis de datos a de la información genética en pacientes que padezcan de cáncer de colon y de aquellos en condiciones normales para discernir patrones que permitan la detección temprana de este tipo de cáncer en pacientes jóvenes. Como resultado se encontraron genes cuya expresión génica es significativamente distinta entre jóvenes y adultos. 
+
+![](https://github.com/ShoyChoy/Introduccion-bioinformatica-con-R/blob/main/heatmap%20expresi%C3%B3n%20g%C3%A9nica.jpg)
+
+
