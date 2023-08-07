@@ -16,3 +16,10 @@ El objetivo de la actividad es consultar la base de datos PUBMED para encontrar 
 
 En esta actividad se emplea un archivo con datos de expresión de genes y clasificación de muestras "Young" y "Old" (TCGA_COADREAD_comp_data). Se aplican pruebas t de Student para encontrar diferencias de expresión entre las clases y se generan matrices con los resultados y p-values. Se filtran genes con poca expresión y se buscan coincidencias entre mayores diferencias de expresión y menores p-values. Se visualiza un heatmap para observar patrones de expresión. Finalmente, se seleccionan genes significativos con p-values < 0.01, revelando genes que son de especial interés como el GATA4, el PCSK1N, el PIWIL1, el PRND O el FZD9, ya que la brecha entre su expresión en jóvenes y adultos mayores es grande y simultáneamente su p value es significativo.
 
+### Actividad 5
+
+El objetivo de la actividad es conocer bases de datos de mutaciones. Se consultaron dos bases de datos, COSMIC (https://cancer.sanger.ac.uk/cosmicLinks to an external site.), que contiene mutaciones relacionadas a cáncer, y gnomAD (https://gnomad.broadinstitute.org/), que contiene mutaciones en personas sanas y enfermedades. 
+
+### Situación problema
+
+Este trabajo es el producto final de la clase. La finalidad del proyecto es elaborar un análisis de datos a de la información genética en pacientes que padezcan de cáncer de colon y de aquellos en condiciones normales para discernir patrones que permitan la detección temprana de este tipo de cáncer en pacientes jóvenes. 
